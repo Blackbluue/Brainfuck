@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
 
     // open file of commands
     //cmd_file = fopen(argv[1], "r");
-    cmd_file = fopen("test.bf", "r");
+    cmd_file = fopen("./test.bf", "r");
     // read commands from file, store in array
     errno = 0;
     cmd_len = collect_commands(cmd_file, &commands);
@@ -25,16 +25,18 @@ int main(int argc, char* argv[]) {
 
     // run commands
     while(cmd_index <= cmd_len) {
-        if(commands[cmd_index] == '[') {
-            cmd_index = run_block(commands, cmd_index, &data_ptr);
-        }
-        execute_command(commands[cmd_index++], &data_ptr);
+        //if(commands[cmd_index] == '[') {
+        //    cmd_index = run_block(commands, cmd_index, &data_ptr);
+        //}
+        //execute_command(commands[cmd_index++], &data_ptr);
+        //printf("test: %lu\n", cmd_index);
+        putchar(commands[cmd_index++]);
     }
     return 0;
 }
 
 /**
- * Reads the file to collect all valid Brainfuck commands from it.
+ * Reads the file to collect all valid BF commands from it.
  * Stores the runnable commands into the passed array.
  * Returns the number of runnable commands found in the file. Non-BF
  * commands are ignored. Initial comment loops are also ignored.
@@ -44,33 +46,64 @@ size_t collect_commands(FILE *commands_file, char **commands) {
     char c;
     size_t cmd_len = 0;
     size_t size = 100;
-    bool balanced = true;
+    int balanced = 0;
     char *buffer = check_mem(malloc(sizeof(char) * size));
 
+    // will ignore first loop if it is the first thing in the file
+    // skip_comment_loop(commands_file);
     while((c = getc(commands_file)) != EOF) {
         if(cmd_len >= size - 1)  // resize if too small
             buffer = check_mem(realloc(buffer, size *= 2));
 
-        // skip inital comment loop here
         if(strchr(valid_commands, c) != NULL) {
             // check for balanced loops
-            if(strchr("[]", c) != NULL) {
-                if(c == '[' && balanced)
-                    balanced = false;
-                else if(c == ']' && !balanced)
-                    balanced = true;
-                else {  // '[]' symbols are not balanced correctly
-                    // set error code
-                    return -1;
-                }
-            }
+            if(c == '[')
+                balanced++;
+            else if(c == ']')
+                balanced--;
             buffer[cmd_len++] = c;
         }
     }
+    // check if braces are balanced
+    if(balanced != 0) {
+        return -1;
+    }
     buffer = realloc(buffer, cmd_len);
     *commands = buffer;
-
     return cmd_len;
+}
+
+/**
+ * Skip the initial comment loop of the commands file, if present. Returns non-zero
+ * on errors.
+ */
+int skip_comment_loop(FILE *commands_file) {
+    char c;
+    // add 1 for '[', subtract 1 for ']'
+    // needs to end in 0, or block is unbalanced
+    bool balanced = false;
+
+    // check if initial comment loop is present
+    // rewind file to beginning if not
+    if((c = getc(commands_file)) != '[') {
+        rewind(commands_file);
+        return 0;
+    }
+        
+    while((c = getc(commands_file)) != EOF) {
+        if(c == '[' && !balanced) {
+            return -1;
+        } else if(c == ']' && balanced) {
+            balanced--;
+            continue;
+        } else  // skip all other characters
+            continue;
+    }
+    // check if braces are balanced
+    if(balanced != 0) {
+        return -1;
+    }
+    return 0;
 }
 
 /**
